@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOL Study - Quản lý học tập thông minh</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts: Roboto -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <!-- Config Tailwind Theme -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Roboto', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            main: '#0066CA',
+                            light: '#84C2FF',
+                            bg: '#F3F4F6'
+                        }
+                    },
+                    boxShadow: {
+                        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.1)',
+                        'brand': '0 4px 15px -2px rgba(0, 102, 202, 0.3)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #F8FAFC; /* Nền tổng thể xám rất nhạt cho dịu mắt */
+            color: #333;
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #CBD5E1; /* Changed to Light Gray */
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94A3B8; /* Changed to Darker Gray on hover */
+        }
+
+        /* Glassmorphism */
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+
+        /* Gradient Text & Backgrounds */
+        .bg-gradient-brand {
+            background: linear-gradient(135deg, #0066CA 0%, #84C2FF 100%);
+        }
+
+        /* Loading Animation */
+        @keyframes pulse-zoom {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        .animate-mascot {
+            animation: pulse-zoom 2s infinite ease-in-out;
+        }
+
+        /* Card Styles */
+        .card-base {
+            transition: all 0.3s ease;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        .card-base:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-completed {
+            background-color: #F0FDF4; /* Xanh lá rất nhạt */
+            border: 1px solid #86EFAC;
+        }
+        .card-missed {
+            background-color: #FEFCE8; /* Vàng rất nhạt */
+            border: 1px solid #FDE047;
+        }
+        .card-today {
+            background-color: #EFF6FF; /* Xanh dương rất nhạt */
+            border: 1px solid #93C5FD;
+            box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.1);
+        }
+        .card-future {
+            background-color: white;
+            border: 1px solid #F1F5F9;
+        }
+
+        /* Subject Block Hover Effect */
+        .subject-block {
+            transition: all 0.2s ease;
+        }
+        .subject-block:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            border-color: #84C2FF;
+        }
+
+        /* NEW: Circular Checkbox */
+        .checkbox-circle {
+            appearance: none;
+            -webkit-appearance: none;
+            background-color: white;
+            margin: 0;
+            font: inherit;
+            color: currentColor;
+            width: 1.35em;
+            height: 1.35em;
+            border: 2px solid #CBD5E1; /* gray-300 */
+            border-radius: 50%;
+            display: grid;
+            place-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .checkbox-circle:checked {
+            background-color: #0066CA; /* brand-main */
+            border-color: #0066CA;
+        }
+        .checkbox-circle:checked::before {
+            content: "\f00c"; /* FontAwesome check */
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            color: white;
+            font-size: 0.8em;
+        }
+        .checkbox-circle:hover {
+            border-color: #0066CA;
+        }
+
+        /* Hide/Show logic */
+        .hidden-screen { display: none !important; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen relative font-sans text-gray-800">
+
+    <!-- Firebase SDK Setup -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+        // CẤU HÌNH FIREBASE
+        const firebaseConfig = {
+            apiKey: "AIzaSyAwrGA9Esp9vj-2ARjW9MXRy9clmhka_bw",
+            authDomain: "dolstudy-9323b.firebaseapp.com",
+            projectId: "dolstudy-9323b",
+            storageBucket: "dolstudy-9323b.firebasestorage.app",
+            messagingSenderId: "583653621935",
+            appId: "1:583653621935:web:eefa89516b6e0ff114145a",
+            measurementId: "G-6NB6QC4BE7"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        
+        window.auth = auth;
+        window.db = db;
+        window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+        window.signInWithEmailAndPassword = signInWithEmailAndPassword;
+        window.signOut = signOut;
+        window.updateProfile = updateProfile;
+        window.doc = doc;
+        window.setDoc = setDoc;
+        window.getDoc = getDoc;
+        window.updateDoc = updateDoc;
+        window.collection = collection;
+        window.addDoc = addDoc;
+        window.deleteDoc = deleteDoc;
+        window.query = query;
+        window.where = where;
+        window.getDocs = getDocs;
+        window.writeBatch = writeBatch;
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                console.log("User Logged In:", user.uid);
+                window.currentUser = user;
+                try {
+                    const userDoc = await getDoc(doc(db, "users", user.uid));
+                    if (userDoc.exists()) {
+                        window.userData = userDoc.data();
+                    } else {
+                        window.userData = { 
+                            name: user.displayName || "Bạn", 
+                            sex: "KhongNhap", 
+                            streak: 0, 
+                            totalHours: 0,
+                            missedSessions: 0 
+                        };
+                        await setDoc(doc(db, "users", user.uid), window.userData);
+                    }
+                    if (!window.userData.name || !window.userData.sex) {
+                        showScreen('screen-profile');
+                    } else {
+                        await initAppData(); 
+                        showScreen('screen-home');
+                    }
+                    updateUIUserInfo();
+                } catch (e) {
+                    console.error("Error fetching user:", e);
+                }
+            } else {
+                console.log("No User");
+                window.currentUser = null;
+                showScreen('screen-welcome');
+            }
+        });
+    </script>
+
+    <!-- === MASCOTS DATA === -->
+    <script>
+        const MASCOTS = {
+            logo: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiDgUii3sh9o03BR1JqPg60L8r_8CE894EF0crZPdDQ0kkAm66W2oQFmoqGqJ8nckjjomTRKdp3FF-dhMVkBW64k9iNxkFnnaXbcXwhxE4UiUYq3UzDZ35CE1IiM4VRIgMm28rPBW8Yf19W5SKvsszGZe2sslYELx76UTYJfvD-yuoQ2_CWWKAGHCvTAxyc/s4000/logo3.png",
+            logoText: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhaptydOzBbniKpwkJRmZ6BM9Lr7eRv0uBDlJ25o6zaMEjv4EU2iecaSlcBs9LKprD7hhnxoEmiPc7Wx49s50hQKJ-mEOLy0qVGwD_5qmEu1JI7JIEdlZIp4v2pdJDyGxLmofMq-RtxXs5HoopZWmeUdy10OF7niPj2-R6RC1ELezGU4DMA_Xjjx7RdnWZf/s2000/16.png",
+            sad: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjgZ8wKrshiBhkUR35klhu0lemT2aYVTHvz5gk3TQd5LSKTAkmCk67LjJXtFMMKlC41k660KNp2E61LgDjtUnsrTCoCbhUMQarH2RhhXdAM6Fce1ll-aFt5Zm4CiYJDusT39xrsyCjwYoI4piAuo9sVzxT822JZEgQXpTm38lwwJPpY32JffZlIttVyGlwE/s320/13.png",
+            swim: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEh4CrPsQV07Xv3SKMV-MQFuyOoG4PXZMI09ID99x53dKm-ZyEiM6VcjnsTonkhHiE-Il0TtiTSA50aTXGToEEVJxxK2JYhl2AsI4rqMjN2-Jl5Zo_GBnTaY5bqOxX6DHmYiNS8fbWPBxn9QRjeooHfvFFdSaQFUMEIubWsOM12kIUCttZjP3Rt69R0CQFWG/s320/12.png",
+            bored: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgXFxhMh7PKuK15qXHodi62mTVG8LAXfpXKGRrP1ie1hngcljGVHTe3hZPXzrrY9A42qlT4yJM8dAl2z7odTxWwCNJPDQghiyy5bkJII5vEMfmkmblOwydfwOg82ffuS63weSxshYMYLE8pCnVe8-zaR-aFZSPdcHkoqnpS5yZejzfuqQn_HcmrQY7kqGjW/s320/11.png",
+            hello: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhrR8WMWBuFFva0_I-Dmv0IclfowerXMnsOyvc1RWFupakMOzHBqtxhhTsAI6yCP1ZyQlfA5JXsZW_nwaBD2hPlBLK5TR2DK1U0LjiscOYOedZSNx9HFdA-CsSTmzFlWuKRU9k8vEaoAsmkQw9NC0lGmXiw5YK5vvVGs28o0rBDv2xxy8XZlZ9mK62DVL6g/s320/10.png",
+            cheer: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEipjdvxgCQVYlE98KZxNQ4qKYXtJeTbSVmmFRgQaK7EcA6wus3KNvh_17UKuQZ7Unq0kqcZ7-HIuoM6Z7-WeZoKUOjBxPHoWeFKhKYG_XM234z9mmyz6D_Z3GIH2ZXOgZWxNq-RJGnXqyTzPBpVtiA-GcJh9RGkjLqHAaPkawB-TBKoznHEzq0UUDKN4ha0/s320/9.png",
+            teacher: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEj4OXSkQzpRHRuBsYv-ARcjpqMZeCPvtTWjtocyfPRb5mVWB6QULJ951GUZADhOCGVZGMbk-ncYTccEDd0453MFyWBcvms7yigfSJTqgv8yxQ5lwWu7gfrpFqalK_fKvYVVs9qHNqDaAZPHZDN8Z6tXRPWVUB9KQQ4Ft-DImdMcG1ve2S6mp7bH5nBVXLno/s320/8.png",
+            worry: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgMdV-ElcxZ6g8spH2PtPfhSpVnOFxqATZxImIFLcpFr5RtnjuyqQLvBPfRoZ4tsNQO8FbRqNDeXiLdMgj6f9LV4SmIjMKoNciOx7QagMEXTECmFsYUUBN1032V6XZgtD2JgEg2cC1i0AS3LFXkgLUSCDx8AmDqkMJatqgUUGI2BonGYBgj7sZjV88jSM4L/s320/7.png",
+            like: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEju-cwfdCTpItIUbZpNT4c0EOP0Iv0_vsZxe0wInj8KTKEGUc50RQpHFYTj7zFttY5O1dmtrjIxpnpkpe8ZvfV6wQx76fI2mKaI3hnKqgyQVzYv8mmDRF2Z8Hk36l5eHWPYdAFD0qeOxdfeUkYM5fsZ7-t7w-fwk2E4Keq9FRCl7LIwtEEdC6cy6w4m7kSv/s320/6.png",
+            talk: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhBFwbAdYTbLUCtNIj84b6IlYzBPcfTWBWGFJa-8qe18jPvFgAQ-jCNKj0zdZ7c-xz_nV_415txUUlT3AiavryzgXLpCv09sEigzOFKLC02sZowWiZEDxarX_aIBue6LEXiQptyXECEYPAtrH_an0PYfKDpGYpnXn8eiV1phK9vMVIIxlwLCrRLLATimAEb/s320/5.png",
+            creative: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhVnXW4Z6JdBRbRYETeLYA1QYzOyb6TMDhKV0sUGYCqN5dlr8cEFTSNGAOdYzhIOAp29QWyWAw2sCTS1te_RTv5RHlqH5h-O9cVjes8aIKyDxN1tnidKTRrp2ARFPn0FFTGBl9l8rQyxtjW-07jBn5xdvUa_v-CRezZ_7MyGmAHanRY-RUyhYK9yD7ibDrh/s320/4.png",
+            think: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiUh7EgnSZuEOuhVrCxS_jXx1Nq4MmKiMbwNdFJCac_PdBkJkndHtQ1Nk_-cGaOVMSs_p0SHhGd9Vl6iHZgidELRauZUJS8cId5kM3wGeNcTZYWD8eJf80QM0nnELYZABR4Xt1CgHCqCvweP6veO2GRSeB0iyGqjqmHSaz_S2djfGRiGDX4RE9IvjqKndJf/s320/3.png",
+            bye: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhlaFMMU-61pQab6-gkhY-CO6i9iZlS0I-HLYmovcvHmbABC3PQ12bl7k85pyPgwAmjEZmq3ud9GcGRMGHfoRMC4IM0trePWZYZyKmAvyHWGcvQCYPc2G4BkMQ4mBYzaCvxjcPaPa9Ezo9qx6NCMGtF1CK9NHZ9EZ5LReFqQ6SCneFjOmXAGlFbJecdRX0p/s320/2.png",
+            write: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiULzXG1hIJ4CFUMjkHbzaMHxx0qi6_RFYkC44w5LoM1LXnY0tobh48W9MOsm4bEQcU8ERxaenfAOo1PG54jhUsU3DwtB9IP-axbBkn3oBFhCAeCvWq50Qag-zl-bXSewMgHX-5YbkAQh_4NYbKxCAKGToToHv-6Zd5113ph2pf3ZvBuNKwW7gG2HpJYkaE/s320/1.png",
+            no_bg: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEj-xlVBwGrYu_9_JgyYeTsuV6NAUXn2UCgCYqpfQYCTnc9oGK4bRxydS7_5SqV8a1Ox26pliwUe_fGnnhScGPwbMu7LG0_wsvOP5FRgBT4TiJHtELsij36u4n3H4IyZhUPC8oK5doUnHL48NP4bvXBRITSt8B12f07tr1b3ZO8XDNPyXTJ6_GB4Qh93_HxK/s320/14.png",
+            with_bg: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEi7Mqi5cxS8ed_NYqC_rja9a9Rx2rniAWsAIxel6iFM88YjwVZjnxNz-cFBZwjK5Yu1Cm4ci6RkoIcy6dOyzmLslJty_tH4yxc5MnU-ka36vDZgNjywdYmWaBgpXtPIJYYhIdIAhuM9ApEkCzBInoK8_FKrcoawKobOP1-rb4DIpVbk4s7m8qcokgqVmE8g/s320/logo%20ne%CC%82%CC%80n%20tra%CC%86%CC%81ng.png",
+            gpt: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiz9w3VbEhOL6J9e4Gl5M7avPX6mWXIvS3vn8OBi5N56AoF4Zd9YkgqnaJT6s99S8P_J1MDL3KMHQofg3tu11woGaYcLtM2aYXlGJUtlPh-LTPkkZG2OszzuJeKE2pKcjMMtqzszDHcJXnzyuL16-_E9b6IsyuP-eNi_IJejlRJ50lo3z6Uo_ASbZOUj05f/s320/2.png",
+            gemini: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEi8gzZl7No2UUifYdhj6-Z8GPz6Kc1-QAWfpmt11uZnog89RqG1ZXsuW5eFMEHxBPHJ2ZgocvnbDUqCWeIaRD5yTB01gRlHmpWympurWhrbZLEhCgv29nBhXS3IVebCnHhGMiZfpG1-yiBxJxaTtvNQaUz9nbf5A0FY3YhhEcKcFgctsdOACe9Zu_yfib_s/s320/1.png"
+        };
+    </script>
+
+    <!-- === MENUBAR === -->
+    <nav id="menubar" class="fixed top-0 w-full z-50 glass-nav h-16 hidden-screen flex items-center justify-between px-6 transition-all duration-300">
+        <!-- Left: Logo -->
+        <div class="flex items-center">
+            <img src="" id="nav-logo" class="h-10 object-contain hover:opacity-80 transition-opacity cursor-pointer" onclick="showScreen('screen-home')">
+        </div>
+        
+        <!-- Center: Icons -->
+        <div class="flex space-x-8 text-xl text-gray-400">
+            <button onclick="showScreen('screen-home')" class="hover:text-brand-main hover:scale-110 transition-all p-2 rounded-lg" title="Trang chủ"><i class="fa-solid fa-house"></i></button>
+            <button onclick="showScreen('screen-study-plan')" class="hover:text-brand-main hover:scale-110 transition-all p-2 rounded-lg" title="Lịch học"><i class="fa-solid fa-map-location-dot"></i></button>
+            <button onclick="showScreen('screen-pomodoro')" class="hover:text-brand-main hover:scale-110 transition-all p-2 rounded-lg" title="Focus Mode"><i class="fa-regular fa-clock"></i></button>
+            <button onclick="showScreen('screen-resources')" class="hover:text-brand-main hover:scale-110 transition-all p-2 rounded-lg" title="Tài liệu"><i class="fa-regular fa-file-lines"></i></button>
+            <button onclick="showScreen('screen-quizlet')" class="hover:text-brand-main hover:scale-110 transition-all p-2 rounded-lg" title="AI Flashcard"><i class="fa-solid fa-bolt"></i></button>
+        </div>
+
+        <!-- Right: Profile -->
+        <div class="relative group">
+            <img src="https://ui-avatars.com/api/?name=User&background=0066CA&color=fff" id="nav-avatar" class="h-10 w-10 rounded-full cursor-pointer border-2 border-white shadow-md hover:shadow-lg transition-all">
+            <!-- Dropdown -->
+            <div class="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl py-2 hidden group-hover:block border border-gray-100 z-50 animate-fade-in">
+                <div class="px-4 py-3 border-b border-gray-100">
+                    <p class="text-sm font-medium text-gray-900 truncate" id="menu-user-name">Người dùng</p>
+                </div>
+                <a href="#" onclick="showScreen('screen-profile')" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-brand-main"><i class="fa-regular fa-user mr-2"></i>Hồ sơ</a>
+                <a href="#" onclick="appSignOut()" class="block px-4 py-2 text-sm text-red-600 hover:bg-red-50"><i class="fa-solid fa-arrow-right-from-bracket mr-2"></i>Đăng xuất</a>
+            </div>
+        </div>
+    </nav>
+    <script>document.getElementById('nav-logo').src = MASCOTS.logoText;</script>
+
+    <!-- === MAIN CONTAINER === -->
+    <main id="app-content" class="flex-grow pt-24 pb-12">
+        
+        <!-- Welcome, Login, Register (No Auth) -->
+        <section id="screen-welcome" class="min-h-screen bg-cover bg-center flex items-center justify-center -mt-24 fixed inset-0 z-40" style="background-image: url('https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEj46FM45KSKSUptrGjz79aNhw40524UuIzwpV_HJ32fT8GcPjWZ6aK_wr4RQP1IJahJQ1p5vRai2tDqc_sW6sE3BEzEWtAA-caYMrK01NSjU0_1D-LLqp_NGyJQx7ewB_96PSVtHBrevCMxJ0ohJigGMF4o7XlMBXkWAIowPey8jA1S-J02IalBbDxv1XU/s1920/Untitled%20design.png');">
+            <div class="container mx-auto px-4 flex flex-col md:flex-row items-center justify-center gap-10">
+                <div class="flex-1 flex justify-center items-center">
+                    <!-- Adjusted height to match right side (~28rem) and maintain aspect ratio -->
+                    <img id="img-konen" class="h-auto md:h-[28rem] w-auto object-contain drop-shadow-2xl transition-all duration-500" alt="Mascot">
+                </div>
+                <div class="flex-1 text-center max-w-md p-4">
+                    <img id="img-logochu" class="h-48 mx-auto mb-2 object-contain" alt="Logo">
+                    <p class="text-gray-700 mb-10 text-xl font-medium drop-shadow-sm">Nền tảng quản lý học tập thông minh & toàn diện.</p>
+                    <div class="flex justify-center gap-6">
+                        <button onclick="showScreen('screen-register')" class="bg-gradient-brand text-white font-bold py-4 px-12 text-xl rounded-full shadow-lg hover:shadow-brand hover:-translate-y-1 transition-all transform hover:scale-105">Đăng Kí</button>
+                        <button onclick="showScreen('screen-login')" class="bg-white text-brand-main border-2 border-brand-main font-bold py-4 px-12 text-xl rounded-full shadow hover:bg-gray-50 transition-all transform hover:scale-105">Đăng Nhập</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="screen-login" class="min-h-screen hidden-screen bg-cover bg-center flex items-center justify-center -mt-24 fixed inset-0 z-40" style="background-image: url('https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEj46FM45KSKSUptrGjz79aNhw40524UuIzwpV_HJ32fT8GcPjWZ6aK_wr4RQP1IJahJQ1p5vRai2tDqc_sW6sE3BEzEWtAA-caYMrK01NSjU0_1D-LLqp_NGyJQx7ewB_96PSVtHBrevCMxJ0ohJigGMF4o7XlMBXkWAIowPey8jA1S-J02IalBbDxv1XU/s1920/Untitled%20design.png');">
+            <div class="bg-white p-10 rounded-3xl shadow-2xl w-full max-w-sm text-center relative border border-white/50 backdrop-blur-sm">
+                <img id="login-logo" class="h-16 mx-auto mb-6">
+                <h2 class="text-2xl font-bold text-brand-main mb-6">ĐĂNG NHẬP</h2>
+                <input type="email" id="login-email" placeholder="Email" class="w-full mb-4 p-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-main/50 bg-gray-50 transition-all">
+                <input type="password" id="login-pass" placeholder="Password" class="w-full mb-8 p-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-main/50 bg-gray-50 transition-all">
+                <div class="flex justify-between items-center">
+                    <button onclick="showScreen('screen-welcome')" class="text-gray-400 hover:text-gray-600 font-medium">Quay lại</button>
+                    <button onclick="appLogin()" class="bg-gradient-brand text-white font-bold py-3 px-8 rounded-xl shadow-lg hover:shadow-xl transition-all">Đăng Nhập</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="screen-register" class="min-h-screen hidden-screen bg-cover bg-center flex items-center justify-center -mt-24 fixed inset-0 z-40" style="background-image: url('https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEj46FM45KSKSUptrGjz79aNhw40524UuIzwpV_HJ32fT8GcPjWZ6aK_wr4RQP1IJahJQ1p5vRai2tDqc_sW6sE3BEzEWtAA-caYMrK01NSjU0_1D-LLqp_NGyJQx7ewB_96PSVtHBrevCMxJ0ohJigGMF4o7XlMBXkWAIowPey8jA1S-J02IalBbDxv1XU/s1920/Untitled%20design.png');">
+            <div class="bg-white p-10 rounded-3xl shadow-2xl w-full max-w-sm text-center relative border border-white/50 backdrop-blur-sm">
+                <img id="reg-logo" class="h-16 mx-auto mb-6">
+                <h2 class="text-2xl font-bold text-brand-main mb-6">ĐĂNG KÍ</h2>
+                <input type="email" id="reg-email" placeholder="Email" class="w-full mb-4 p-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-main/50 bg-gray-50 transition-all">
+                <input type="password" id="reg-pass" placeholder="Password" class="w-full mb-8 p-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-main/50 bg-gray-50 transition-all">
+                <div class="flex justify-between items-center">
+                    <button onclick="showScreen('screen-welcome')" class="text-gray-400 hover:text-gray-600 font-medium">Quay lại</button>
+                    <button onclick="appRegister()" class="bg-gradient-brand text-white font-bold py-3 px-8 rounded-xl shadow-lg hover:shadow-xl transition-all">Đăng Kí</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="screen-profile" class="min-h-screen hidden-screen flex items-center justify-center bg-gray-50 -mt-24 fixed inset-0 z-40">
+            <div class="bg-white p-10 rounded-3xl shadow-xl w-full max-w-md relative">
+                <img id="profile-logo" class="h-16 mx-auto mb-6">
+                <h3 class="text-2xl font-bold mb-6 text-gray-800 text-center">Thông tin cá nhân</h3>
+                <div class="text-left space-y-5">
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Họ và tên</label>
+                        <input type="text" id="name" class="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-light focus:border-brand-main outline-none transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Email</label>
+                        <input type="text" id="email" disabled class="w-full p-3 border border-gray-200 rounded-xl bg-gray-100 text-gray-500 cursor-not-allowed">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Giới tính</label>
+                        <select id="sex" class="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-light focus:border-brand-main outline-none">
+                            <option value="Nam">Nam</option>
+                            <option value="Nu">Nữ</option>
+                            <option value="KhongNhap">Không nhập</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-4 mt-10">
+                    <button onclick="showScreen('screen-home')" class="px-6 py-2 text-gray-500 hover:text-gray-700 font-medium">Huỷ</button>
+                    <button onclick="saveProfile()" class="bg-brand-main text-white px-8 py-2 rounded-xl shadow hover:bg-blue-700 transition-colors font-bold">Lưu</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="screen-loading" class="hidden-screen fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center">
+            <img id="img-boi" class="w-40 animate-mascot mb-6">
+            <div class="w-64 h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div class="h-full bg-gradient-brand w-1/2 animate-pulse rounded-full"></div>
+            </div>
+            <p class="mt-4 text-brand-main font-medium">Đang tải dữ liệu...</p>
+        </section>
+
+        <!-- 3.9. Home Screen -->
+        <section id="screen-home" class="hidden-screen w-full max-w-[1920px] mx-auto px-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-8">
+                <div>
+                    <h1 class="text-4xl font-light text-gray-800">Xin chào, <span id="home-username" class="font-bold text-transparent bg-clip-text bg-gradient-brand">...</span></h1>
+                    <p class="text-gray-500 mt-2">Chúc bạn một ngày học tập hiệu quả!</p>
+                </div>
+                
+                <div id="home-aim" class="border border-brand-light/30 rounded-3xl p-8 bg-white shadow-soft relative overflow-hidden">
+                    <div class="absolute top-0 right-0 w-32 h-32 bg-brand-light/10 rounded-bl-full -mr-8 -mt-8"></div>
+                    
+                    <h3 class="text-xl font-bold mb-6 text-brand-main flex items-center"><i class="fa-solid fa-bullseye mr-3 text-2xl"></i>Mục tiêu hôm nay</h3>
+                    <ul id="home-todo-list" class="space-y-4 mb-16">
+                        <!-- Dynamic Todos -->
+                    </ul>
+                    <div class="absolute bottom-6 right-8 flex gap-3">
+                        <button class="bg-yellow-100 text-yellow-700 px-5 py-2.5 rounded-xl text-sm font-bold shadow-sm hover:bg-yellow-200 transition-colors hidden" id="btn-hoc-bu">Học Bù</button>
+                        <button onclick="startStudySession()" class="bg-gradient-brand text-white px-8 py-2.5 rounded-xl font-bold shadow-brand hover:shadow-lg hover:scale-105 transition-all flex items-center"><i class="fa-solid fa-play mr-2"></i> BẮT ĐẦU</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <!-- Updated Date Display Format -->
+                <div class="text-right pt-2 pb-2">
+                    <div class="text-4xl font-bold text-gray-800 tracking-tight" id="home-full-date">...</div>
+                </div>
+
+                <div class="bg-white border border-gray-100 rounded-3xl p-6 space-y-4 shadow-soft">
+                    <div class="flex items-center gap-4 p-3 hover:bg-gray-50 rounded-xl transition-colors">
+                        <div class="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-500 text-xl"><i class="fa-solid fa-fire"></i></div>
+                        <div>
+                            <div class="text-sm text-gray-500">Chuỗi liên tiếp</div>
+                            <div class="font-bold text-gray-800"><span id="stat-streak" class="text-2xl text-brand-main">0</span> ngày</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4 p-3 hover:bg-gray-50 rounded-xl transition-colors">
+                        <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-500 text-xl"><i class="fa-solid fa-clock"></i></div>
+                        <div>
+                            <div class="text-sm text-gray-500">Thời gian học</div>
+                            <div class="font-bold text-gray-800"><span id="stat-hours" class="text-2xl text-brand-main">0</span> giờ</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4 p-3 hover:bg-gray-50 rounded-xl transition-colors">
+                        <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-500 text-xl"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                        <div>
+                            <div class="text-sm text-gray-500">Chưa hoàn thành</div>
+                            <div class="font-bold text-gray-800"><span id="stat-missed" class="text-2xl text-brand-main">0</span> buổi</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <button onclick="window.open('https://chatgpt.com','_blank')" class="flex flex-col items-center justify-center gap-2 bg-white border border-gray-100 p-4 rounded-2xl shadow-sm hover:shadow-md hover:border-brand-main/30 transition-all group">
+                        <img id="btn-gpt-img" class="h-8 w-8 group-hover:scale-110 transition-transform"> <span class="font-medium text-gray-600">ChatGPT</span>
+                    </button>
+                    <button onclick="window.open('https://gemini.google.com','_blank')" class="flex flex-col items-center justify-center gap-2 bg-white border border-gray-100 p-4 rounded-2xl shadow-sm hover:shadow-md hover:border-brand-main/30 transition-all group">
+                        <img id="btn-gemini-img" class="h-8 w-8 group-hover:scale-110 transition-transform"> <span class="font-medium text-gray-600">Gemini</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3.10. Study Plan Screen -->
+        <!-- Changed: Added fixed height h-[calc(100vh-9rem)] and overflow-hidden to prevent body scroll -->
+        <section id="screen-study-plan" class="hidden-screen w-full max-w-[1920px] mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-8 h-[calc(100vh-9rem)]">
+            <!-- Sidebar -->
+            <div class="md:col-span-1 space-y-6 overflow-y-auto pr-2 custom-scrollbar">
+                <button onclick="showScreen('screen-home')" class="w-full py-3 bg-white border border-gray-200 rounded-xl font-bold text-gray-600 shadow-sm hover:bg-gray-50 hover:text-brand-main transition-all flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-arrow-left"></i> Về trang chủ
+                </button>
+                
+                <div class="bg-white rounded-2xl shadow-soft p-4 grid grid-cols-1 gap-1 text-center border border-gray-100">
+                    <div class="p-3 border-b border-gray-50">
+                        <div class="text-xs text-gray-400 uppercase tracking-wider mb-1">Chuỗi ngày</div>
+                        <div class="font-bold text-brand-main text-3xl" id="plan-streak">0</div>
+                    </div>
+                    <button onclick="openRescheduleModal()" class="p-4 hover:bg-blue-50 text-brand-main font-bold rounded-xl transition-colors text-left flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center"><i class="fa-solid fa-calendar-days text-sm"></i></div>
+                        Xếp lại lịch
+                    </button>
+                    <button onclick="toggleNotifyModal()" class="p-4 hover:bg-blue-50 text-gray-600 font-medium rounded-xl transition-colors text-left flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center"><i class="fa-regular fa-bell text-sm"></i></div>
+                        Thông báo
+                    </button>
+                </div>
+
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 text-center">
+                    <img id="img-viet" class="w-32 mx-auto object-contain mb-2" alt="Mascot writing">
+                    <p class="text-sm text-gray-500 italic">"Kiên trì là chìa khoá của thành công!"</p>
+                </div>
+            </div>
+
+            <!-- Main Calendar (Card Layout) -->
+            <!-- Changed: Added flex flex-col and overflow-hidden to manage internal scrolling -->
+            <div class="md:col-span-3 flex flex-col overflow-hidden h-full">
+                <!-- Header (Fixed) -->
+                <div class="flex justify-between items-center mb-4 shrink-0 pr-4">
+                    <h2 class="text-2xl font-bold text-gray-800">Lộ Trình Học Tập</h2>
+                    <div class="text-sm text-gray-400"><i class="fa-solid fa-circle-info mr-1"></i>Cuộn để xem tiếp</div>
+                </div>
+                
+                <!-- Container for Months (Scrollable) -->
+                <!-- Changed: Added flex-grow, overflow-y-auto, and padding adjustments -->
+                <div id="plan-container" class="flex-grow overflow-y-auto pr-4 pb-4 flex flex-col gap-10">
+                    <!-- Dynamic Month Blocks will be injected here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- 3.11 Create Plan Screen - Updated with Draft List -->
+        <section id="screen-create-plan" class="hidden-screen w-full max-w-[1920px] mx-auto px-6">
+            
+            <!-- MAIN VIEW: Subject List -->
+            <div id="cp-main-view" class="max-w-4xl mx-auto bg-white p-8 rounded-3xl shadow-soft">
+                <div class="flex justify-between items-center mb-8">
+                    <h2 class="text-3xl font-bold text-brand-main flex items-center gap-3">
+                        <div class="w-12 h-12 bg-brand-light/20 rounded-xl flex items-center justify-center"><img id="img-plan-icon" class="h-8"></div>
+                        Thiết Lập Lộ Trình
+                    </h2>
+                    <button onclick="showScreen('screen-study-plan')" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-times text-2xl"></i></button>
+                </div>
+                
+                <p class="text-gray-500 mb-6">Danh sách các môn học trong kế hoạch của bạn:</p>
+
+                <!-- Changed to Vertical List (cols-1) -->
+                <div id="cp-draft-list" class="grid grid-cols-1 gap-4 mb-8">
+                    <!-- Dynamic Draft Blocks -->
+                </div>
+
+                <!-- Add Button -->
+                <button onclick="openSubjectEditor(null)" class="w-full py-6 border-2 border-dashed border-gray-300 rounded-2xl text-gray-400 hover:border-brand-main hover:text-brand-main hover:bg-blue-50/50 transition-all font-bold flex flex-col items-center justify-center gap-3 group">
+                    <div class="w-14 h-14 rounded-full bg-gray-100 group-hover:bg-brand-main group-hover:text-white flex items-center justify-center transition-colors">
+                        <i class="fa-solid fa-plus text-2xl"></i>
+                    </div>
+                    <span class="text-lg">Thêm môn học mới</span>
+                </button>
+
+                <div class="mt-10 pt-8 border-t border-gray-100 flex justify-end gap-4">
+                    <button onclick="showScreen('screen-study-plan')" class="px-8 py-3 rounded-xl text-gray-600 hover:bg-gray-100 font-medium">Huỷ bỏ</button>
+                    <button onclick="commitStudyPlan()" class="bg-gradient-brand text-white px-10 py-3 rounded-xl shadow-brand font-bold hover:shadow-lg hover:-translate-y-0.5 transition-all">Lưu & Tạo Lịch Trình</button>
+                </div>
+            </div>
+
+            <!-- EDITOR VIEW: Step 1 & 2 -->
+            <div id="cp-editor-view" class="hidden max-w-4xl mx-auto bg-white p-8 rounded-3xl shadow-soft relative">
+                <button onclick="closeSubjectEditor()" class="absolute top-6 right-6 text-gray-400 hover:text-red-500 w-10 h-10 rounded-full hover:bg-red-50 flex items-center justify-center transition-colors"><i class="fa-solid fa-times text-xl"></i></button>
+                
+                <h3 class="text-2xl font-bold text-gray-800 mb-8 border-l-4 border-brand-main pl-4">Chi tiết môn học</h3>
+
+                <!-- Step 1 -->
+                <div id="cp-step-1">
+                    <div class="space-y-6 mb-8">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Tên môn học</label>
+                            <input type="text" id="cp-subject" class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-brand-main/20 focus:border-brand-main outline-none transition-all" placeholder="Ví dụ: Toán Cao Cấp">
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">Ngày bắt đầu</label>
+                                <input type="date" id="cp-start-date" class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-brand-main/20 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">Lịch học trong tuần</label>
+                                <div class="flex gap-2 flex-wrap">
+                                    <label class="cursor-pointer select-none">
+                                        <input type="checkbox" value="1" class="cp-day peer sr-only">
+                                        <div class="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center text-gray-500 font-bold peer-checked:bg-brand-main peer-checked:text-white peer-checked:border-brand-main hover:bg-gray-50 transition-all">T2</div>
+                                    </label>
+                                    <label class="cursor-pointer select-none">
+                                        <input type="checkbox" value="2" class="cp-day peer sr-only">
+                                        <div class="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center text-gray-500 font-bold peer-checked:bg-brand-main peer-checked:text-white peer-checked:border-brand-main hover:bg-gray-50 transition-all">T3</div>
+                                    </label>
+                                    <label class="cursor-pointer select-none">
+                                        <input type="checkbox" value="3" class="cp-day peer sr-only">
+                                        <div class="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center text-gray-500 font-bold peer-checked:bg-brand-main peer-checked:text-white peer-checked:border-brand-main hover:bg-gray-50 transition-all">T4</div>
+                                    </label>
+                                    <label class="cursor-pointer select-none">
+                                        <input type="checkbox" value="4" class="cp-day peer sr-only">
+                                        <div class="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center text-gray-500 font-bold peer-checked:bg-brand-main peer-checked:text-white peer-checked:border-brand-main hover:bg-gray-50 transition-all">T5</div>
+                                    </label>
+                                    <label class="cursor-pointer select-none">
+                                        <input type="checkbox" value="5" class="cp-day peer sr-only">
+                                        <div class="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center text-gray-500 font-bold peer-checked:bg-brand-main peer-checked:text-white peer-checked:border-brand-main hover:bg-gray-50 transition-all">T6</div>
+                                    </label>
+                                    <label class="cursor-pointer select-none">
+                                        <input type="checkbox" value="6" class="cp-day peer sr-only">
+                                        <div class="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center text-gray-500 font-bold peer-checked:bg-brand-main peer-checked:text-white peer-checked:border-brand-main hover:bg-gray-50 transition-all">T7</div>
+                                    </label>
+                                    <label class="cursor-pointer select-none">
+                                        <input type="checkbox" value="0" class="cp-day peer sr-only">
+                                        <div class="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center text-gray-500 font-bold peer-checked:bg-brand-main peer-checked:text-white peer-checked:border-brand-main hover:bg-gray-50 transition-all">CN</div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Danh sách bài học (Mỗi dòng 1 bài)</label>
+                            <textarea id="cp-content" rows="8" class="w-full border border-gray-300 rounded-xl p-4 focus:ring-2 focus:ring-brand-main/20 focus:border-brand-main outline-none transition-all font-mono text-sm leading-relaxed" placeholder="Bài 1: Tổng quan&#10;Bài 2: Cơ sở lý thuyết&#10;..."></textarea>
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-4">
+                        <button onclick="goToStep2()" class="bg-brand-main text-white px-8 py-3 rounded-xl shadow font-bold hover:bg-blue-700 transition-colors">Tiếp tục: Cấu hình chi tiết <i class="fa-solid fa-arrow-right ml-2"></i></button>
+                    </div>
+                </div>
+
+                <!-- Step 2 -->
+                <div id="cp-step-2" class="hidden">
+                    <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6 text-sm text-blue-800 flex items-center">
+                        <i class="fa-solid fa-circle-info mr-3 text-lg"></i>
+                        Thiết lập số buổi luyện tập và ôn thi cho từng bài học.
+                    </div>
+                    <div id="cp-lessons-list" class="space-y-4 mb-8 max-h-[500px] overflow-y-auto pr-2">
+                        <!-- Rows -->
+                    </div>
+                    <div class="flex justify-end gap-4 border-t border-gray-100 pt-6">
+                        <button onclick="backToStep1()" class="px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-arrow-left mr-2"></i> Quay lại</button>
+                        <button onclick="saveSubjectToDraft()" class="bg-green-600 text-white px-8 py-3 rounded-xl shadow hover:bg-green-700 transition-colors font-bold"><i class="fa-solid fa-check mr-2"></i> Lưu môn học</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Resources, Quizlet, Pomodoro, Notification, Reschedule Modals (Keep existing layout but verify classes) -->
+        <section id="screen-resources" class="hidden-screen w-full max-w-[1920px] mx-auto px-6">
+            <!-- (Content same as before, layout is grid so it adapts) -->
+             <div class="max-w-5xl mx-auto">
+                <div class="flex justify-between items-center mb-8">
+                    <h2 class="text-3xl font-bold text-gray-800">Thư viện Tài liệu</h2>
+                    <button onclick="addResource()" class="bg-brand-main text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-brand hover:shadow-lg transition-all"><i class="fa-solid fa-plus mr-2"></i>Thêm mới</button>
+                </div>
+                <div class="flex space-x-2 bg-gray-100 p-1.5 rounded-xl mb-8 w-fit">
+                    <button onclick="switchResTab('course')" id="tab-course" class="px-6 py-2 rounded-lg bg-white shadow text-brand-main font-bold transition-all">Khóa Học</button>
+                    <button onclick="switchResTab('doc')" id="tab-doc" class="px-6 py-2 rounded-lg text-gray-500 hover:text-gray-700 font-medium transition-all">Tài Liệu</button>
+                </div>
+                <div id="res-course-content" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+                <div id="res-doc-content" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 hidden"></div>
+            </div>
+        </section>
+
+        <section id="screen-quizlet" class="hidden-screen w-full max-w-[1920px] mx-auto px-6 py-8">
+            <div class="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="bg-white p-8 rounded-3xl shadow-soft">
+                    <h3 class="font-bold text-xl mb-6 text-brand-main flex items-center gap-2"><i class="fa-solid fa-wand-magic-sparkles"></i> Tạo Flashcard AI</h3>
+                    <textarea id="quiz-input" class="w-full h-80 border border-gray-200 rounded-xl p-4 mb-6 focus:ring-2 focus:ring-brand-light focus:border-brand-main outline-none resize-none" placeholder="Dán nội dung văn bản vào đây..."></textarea>
+                    <button onclick="processQuizlet()" class="w-full bg-brand-main text-white py-4 rounded-xl font-bold hover:bg-blue-700 transition-colors shadow-brand">Tạo Thẻ Ngay</button>
+                </div>
+                <div class="bg-white p-8 rounded-3xl shadow-soft relative">
+                    <h3 class="font-bold text-xl mb-6 text-gray-700">Kết quả</h3>
+                    <textarea id="quiz-output" readonly class="w-full h-80 bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6 font-mono text-sm resize-none text-gray-600 focus:outline-none"></textarea>
+                    <button onclick="copyQuizlet()" class="absolute top-8 right-8 text-gray-400 hover:text-brand-main bg-white p-2 rounded-lg shadow-sm border border-gray-100"><i class="fa-regular fa-copy text-xl"></i></button>
+                    <p class="text-sm text-gray-400 italic bg-yellow-50 p-3 rounded-lg border border-yellow-100"><i class="fa-solid fa-lightbulb mr-2 text-yellow-400"></i>Copy kết quả và dán vào chế độ "Nhập từ Word/Excel" trên Quizlet.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Pomodoro Overlay -->
+        <section id="screen-pomodoro" class="hidden-screen fixed inset-0 bg-white z-[60] flex flex-col animate-fade-in">
+            <div class="h-20 flex items-center justify-between px-8 border-b border-gray-100">
+                <span class="font-bold text-2xl text-brand-main flex items-center gap-2"><i class="fa-solid fa-bullseye"></i> Focus Mode</span>
+                <button onclick="showScreen('screen-home')" class="text-gray-400 hover:text-red-500 text-3xl transition-colors"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="flex-grow flex flex-col items-center justify-center bg-gray-50/50">
+                <div class="w-96 h-96 rounded-full border-8 border-brand-light/20 flex items-center justify-center mb-10 relative">
+                    <div class="absolute inset-0 border-8 border-brand-main rounded-full border-t-transparent animate-spin-slow" style="animation-duration: 3s"></div>
+                    <div class="text-7xl md:text-8xl font-mono font-bold text-gray-800 tracking-wider" id="timer-display">25:00</div>
+                </div>
+                
+                <div class="flex gap-8 mb-12">
+                    <button onclick="startTimer()" class="w-20 h-20 rounded-full bg-brand-main text-white text-3xl flex items-center justify-center shadow-lg hover:scale-110 hover:shadow-brand transition-all"><i class="fa-solid fa-play ml-1"></i></button>
+                    <button onclick="pauseTimer()" class="w-20 h-20 rounded-full bg-yellow-400 text-white text-3xl flex items-center justify-center shadow-lg hover:scale-110 transition-all"><i class="fa-solid fa-pause"></i></button>
+                    <button onclick="resetTimer()" class="w-20 h-20 rounded-full bg-gray-400 text-white text-3xl flex items-center justify-center shadow-lg hover:scale-110 transition-all"><i class="fa-solid fa-rotate-right"></i></button>
+                </div>
+                <button onclick="finishPomodoroTask()" class="bg-green-500 text-white px-10 py-4 rounded-2xl font-bold shadow-lg hover:bg-green-600 hover:-translate-y-1 transition-all text-xl flex items-center gap-3">
+                    <i class="fa-solid fa-check-circle text-2xl"></i> Hoàn thành bài học
+                </button>
+                <p class="mt-8 text-gray-500 text-lg bg-white px-6 py-2 rounded-full shadow-sm border border-gray-100">Đang học: <span id="pomo-task-name" class="font-bold text-brand-main">Tự học</span></p>
+            </div>
+        </section>
+
+        <!-- Notification Modal -->
+        <div id="modal-notify" class="hidden fixed inset-0 bg-black/40 z-[70] flex items-center justify-center backdrop-blur-sm">
+            <div class="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-sm mx-4 transform transition-all scale-100">
+                <div class="flex items-center justify-between mb-8">
+                    <h3 class="font-bold text-xl text-gray-800">Cài đặt Thông báo</h3>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" value="" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-main"></div>
+                    </label>
+                </div>
+                <div class="space-y-6 mb-8">
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                        <span class="text-sm font-bold text-gray-600">Giờ nhắc nhở</span>
+                        <input type="time" class="border border-gray-200 rounded-lg p-2 text-sm bg-white focus:border-brand-main outline-none">
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                        <span class="text-sm font-bold text-gray-600">Lặp lại sau</span>
+                        <div class="flex items-center">
+                            <input type="number" class="w-16 border border-gray-200 rounded-lg p-2 text-sm text-center mr-2 focus:border-brand-main outline-none" value="30">
+                            <span class="text-xs text-gray-500">Phút</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <button class="py-3 border border-gray-200 rounded-xl text-gray-500 hover:bg-gray-50 font-medium">Mặc định</button>
+                    <button onclick="toggleNotifyModal()" class="py-3 bg-brand-main text-white rounded-xl hover:bg-blue-700 shadow-lg font-bold">Lưu</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reschedule Modal -->
+        <div id="modal-reschedule" class="hidden fixed inset-0 bg-black/40 z-[70] flex items-center justify-center backdrop-blur-sm">
+            <div class="bg-white p-8 rounded-3xl shadow-2xl max-w-sm w-full mx-4 text-center">
+                <div class="w-16 h-16 bg-blue-50 text-brand-main rounded-full flex items-center justify-center mx-auto mb-4 text-2xl"><i class="fa-solid fa-calendar-check"></i></div>
+                <h3 class="text-2xl font-bold text-gray-800 mb-2">Xếp lại lịch học</h3>
+                <p class="text-gray-500 mb-8">Bạn muốn điều chỉnh kế hoạch hiện tại hay bắt đầu lại từ đầu?</p>
+                <div class="space-y-3">
+                    <button onclick="handleReschedule('edit')" class="w-full py-4 bg-brand-main text-white rounded-xl font-bold hover:bg-blue-700 shadow-brand transition-all">
+                        Sửa đổi / Bổ sung
+                    </button>
+                    <button onclick="handleReschedule('reset')" class="w-full py-4 bg-white text-red-500 border border-red-100 rounded-xl font-bold hover:bg-red-50 transition-all">
+                        Tạo mới hoàn toàn
+                    </button>
+                    <button onclick="document.getElementById('modal-reschedule').classList.add('hidden')" class="w-full py-3 text-gray-400 hover:text-gray-600 text-sm mt-2">
+                        Huỷ bỏ
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- === FOOTER === -->
+    <footer id="footer" class="border-t border-gray-200 py-8 bg-white mt-auto">
+        <div class="container mx-auto px-4 flex flex-col md:flex-row items-center justify-between">
+            <!-- Increased height to h-32 (approx 8rem/128px) -->
+            <img id="footer-logo" class="h-32 mb-4 md:mb-0 opacity-80">
+            <div class="text-right text-sm text-gray-400">
+                <p>&copy; 2026 DOLStudy.</p>
+                <p>Giải pháp học tập thông minh trong thời đại số.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- === LOGIC APP === -->
+    <script>
+        // ... (Keep existing script logic exactly as is, but modify renderPlanUI slightly for Month Grouping) ...
+        
+        // Init Image Sources
+        document.getElementById('login-logo').src = MASCOTS.logo;
+        document.getElementById('reg-logo').src = MASCOTS.logo;
+        document.getElementById('profile-logo').src = MASCOTS.logo;
+        document.getElementById('img-konen').src = MASCOTS.no_bg;
+        // Updated: Change img-logochu to use the correct logo URL (MASCOTS.logo)
+        document.getElementById('img-logochu').src = MASCOTS.logo;
+        document.getElementById('img-boi').src = MASCOTS.swim;
+        document.getElementById('btn-gpt-img').src = MASCOTS.gpt;
+        document.getElementById('btn-gemini-img').src = MASCOTS.gemini;
+        document.getElementById('img-viet').src = MASCOTS.write;
+        document.getElementById('img-plan-icon').src = MASCOTS.creative; 
+        document.getElementById('footer-logo').src = MASCOTS.logoText;
+        document.getElementById('nav-logo').src = MASCOTS.logoText; // Use text logo for nav
+
+        // ... Navigation, Auth, Profile functions (unchanged) ...
+        function showScreen(screenId) {
+            document.querySelectorAll('section').forEach(el => el.classList.add('hidden-screen'));
+            document.getElementById(screenId).classList.remove('hidden-screen');
+            const menubar = document.getElementById('menubar');
+            if(screenId === 'screen-welcome' || screenId === 'screen-login' || screenId === 'screen-register' || screenId === 'screen-loading') {
+                menubar.classList.add('hidden-screen');
+            } else {
+                menubar.classList.remove('hidden-screen');
+            }
+            if(screenId === 'screen-home') loadHomeData();
+            if(screenId === 'screen-study-plan') renderPlanUI();
+            if(screenId === 'screen-resources') loadResources();
+        }
+        function toggleNotifyModal() { document.getElementById('modal-notify').classList.toggle('hidden'); }
+        async function appLogin() {
+            const email = document.getElementById('login-email').value;
+            const pass = document.getElementById('login-pass').value;
+            try { showScreen('screen-loading'); await window.signInWithEmailAndPassword(window.auth, email, pass); } 
+            catch (error) { alert("Lỗi đăng nhập: " + error.message); showScreen('screen-login'); }
+        }
+        async function appRegister() {
+            const email = document.getElementById('reg-email').value;
+            const pass = document.getElementById('reg-pass').value;
+            try {
+                showScreen('screen-loading');
+                const userCred = await window.createUserWithEmailAndPassword(window.auth, email, pass);
+                await window.setDoc(window.doc(window.db, "users", userCred.user.uid), {
+                    email: email, name: "", sex: "KhongNhap", streak: 0, totalHours: 0, missedSessions: 0
+                });
+            } catch (error) { alert("Lỗi đăng kí: " + error.message); showScreen('screen-register'); }
+        }
+        async function appSignOut() { await window.signOut(window.auth); location.reload(); }
+        async function saveProfile() {
+            const name = document.getElementById('name').value;
+            const sex = document.getElementById('sex').value;
+            if(!window.currentUser) return;
+            try {
+                await window.updateDoc(window.doc(window.db, "users", window.currentUser.uid), { name: name, sex: sex });
+                window.userData.name = name; window.userData.sex = sex; updateUIUserInfo(); showScreen('screen-home');
+            } catch(e) { console.error(e); alert("Lỗi lưu thông tin."); }
+        }
+        function updateUIUserInfo() {
+            if(window.userData) {
+                document.getElementById('name').value = window.userData.name || "";
+                document.getElementById('email').value = window.userData.email || "";
+                document.getElementById('sex').value = window.userData.sex || "KhongNhap";
+                document.getElementById('home-username').innerText = window.userData.name || "Bạn";
+                document.getElementById('menu-user-name').innerText = window.userData.name || "Người dùng";
+                const avtUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(window.userData.name)}&background=0066CA&color=fff`;
+                document.getElementById('nav-avatar').src = avtUrl;
+                document.getElementById('stat-streak').innerText = window.userData.streak || 0;
+                document.getElementById('plan-streak').innerText = window.userData.streak || 0;
+                document.getElementById('stat-hours').innerText = window.userData.totalHours || 0;
+                document.getElementById('stat-missed').innerText = window.userData.missedSessions || 0;
+            }
+        }
+
+        // -- Data & Logic --
+        window.studyPlans = [];
+        window.draftSubjects = [];
+        window.editingIndex = null;
+        window.tempLessons = [];
+
+        async function initAppData() {
+            const uid = window.currentUser.uid;
+            const q = window.query(window.collection(window.db, "plans"), window.where("uid", "==", uid));
+            const snap = await window.getDocs(q);
+            window.studyPlans = [];
+            snap.forEach((doc) => window.studyPlans.push({id: doc.id, ...doc.data()}));
+            await checkStreak();
+        }
+
+        // --- NEW RENDER PLAN WITH MONTH GROUPING ---
+        function renderPlanUI() {
+            const container = document.getElementById('plan-container');
+            container.innerHTML = '';
+            
+            // Flatten events
+            let allEvents = [];
+            window.studyPlans.forEach(plan => {
+                plan.schedule.forEach(item => {
+                    allEvents.push({...item, planId: plan.id});
+                });
+            });
+
+            if (allEvents.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-20">
+                        <img src="${MASCOTS.bored}" class="h-40 mx-auto mb-4 opacity-50">
+                        <p class="text-gray-400 text-lg">Chưa có lịch học nào. Hãy tạo lộ trình mới nhé!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            allEvents.sort((a,b) => new Date(a.date) - new Date(b.date));
+
+            // Group by Month
+            const groupedByMonth = {};
+            
+            allEvents.forEach(evt => {
+                const d = new Date(evt.date);
+                const monthKey = `Tháng ${d.getMonth() + 1}, ${d.getFullYear()}`;
+                
+                if (!groupedByMonth[monthKey]) groupedByMonth[monthKey] = {};
+                if (!groupedByMonth[monthKey][evt.date]) groupedByMonth[monthKey][evt.date] = [];
+                
+                groupedByMonth[monthKey][evt.date].push(evt);
+            });
+
+            const todayStr = new Date().toISOString().split('T')[0];
+            const daysOfWeek = ['CN', 'Th 2', 'Th 3', 'Th 4', 'Th 5', 'Th 6', 'Th 7'];
+
+            // Render Groups
+            for (const [monthName, dates] of Object.entries(groupedByMonth)) {
+                // Month Header
+                // Changed: Sticky top-0 (relative to scroll container) instead of top-20
+                // Added bg-[#F8FAFC] (matching body bg) and z-10 to cover scrolling content
+                container.insertAdjacentHTML('beforeend', `
+                    <div class="mb-2">
+                        <h3 class="text-xl font-bold text-gray-800 border-l-4 border-brand-main pl-3 mb-6 sticky top-0 bg-[#F8FAFC] z-10 py-3 shadow-sm">${monthName}</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"> 
+                            ${Object.entries(dates).map(([date, events]) => {
+                                const dateObj = new Date(date);
+                                const isToday = date === todayStr;
+                                const isPast = date < todayStr;
+                                const allDone = events.every(e => e.completed);
+                                
+                                // Format date: "Th 7, 14 thg 2"
+                                const formattedDate = `${daysOfWeek[dateObj.getDay()]}, ${dateObj.getDate()} thg ${dateObj.getMonth() + 1}`;
+                                
+                                let cardClass = 'card-future';
+                                if (isToday) cardClass = 'card-today';
+                                else if (isPast && !allDone) cardClass = 'card-missed';
+                                else if (allDone) cardClass = 'card-completed';
+
+                                // NEW: Add ID for auto-scrolling
+                                const cardId = isToday ? 'id="today-card"' : '';
+
+                                return `
+                                <div ${cardId} class="${cardClass} card-base rounded-2xl p-5 relative overflow-hidden">
+                                    <div class="flex justify-between items-center mb-4 pb-3 border-b border-black/5">
+                                        <div class="font-bold text-gray-800 text-lg">
+                                            ${formattedDate}
+                                        </div>
+                                        ${allDone ? '<div class="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center text-green-600 text-xs"><i class="fa-solid fa-check"></i></div>' : ''}
+                                    </div>
+                                    <div class="space-y-4 flex-grow">
+                                        ${events.map(evt => `
+                                            <div class="flex items-start gap-3 group cursor-pointer" onclick="openPomodoro('${evt.content}', '${evt.id}', '${evt.planId}')">
+                                                <div class="pt-1">
+                                                    <input type="checkbox" ${evt.completed ? 'checked' : ''} class="checkbox-circle" onclick="event.stopPropagation(); toggleTask('${evt.planId}', '${evt.id}', this.checked)">
+                                                </div>
+                                                <div class="flex-grow">
+                                                    <div class="flex items-baseline flex-wrap gap-2 mb-1">
+                                                        <span class="font-bold text-brand-main text-[15px] group-hover:underline">${evt.subject}</span>
+                                                        <span class="text-[15px] text-gray-500 font-medium italic">${evt.type}</span>
+                                                    </div>
+                                                    <div class="text-sm text-gray-700 font-medium leading-snug pl-1 border-l-2 border-gray-200">${evt.content}</div>
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>`;
+                            }).join('')}
+                        </div>
+                    </div>
+                `);
+            }
+
+            // NEW: Auto scroll to today
+            setTimeout(() => {
+                const todayEl = document.getElementById('today-card');
+                if(todayEl) {
+                    todayEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // Optional: Add a highlight effect
+                    todayEl.classList.add('ring-2', 'ring-brand-main', 'ring-offset-2');
+                    setTimeout(() => todayEl.classList.remove('ring-2', 'ring-brand-main', 'ring-offset-2'), 2000);
+                }
+            }, 500); // Delay slightly to ensure render complete
+        }
+
+        async function toggleTask(planId, taskId, isChecked) {
+            const plan = window.studyPlans.find(p => p.id === planId);
+            const task = plan.schedule.find(t => t.id === taskId);
+            if(task) {
+                task.completed = isChecked;
+                renderPlanUI();
+                await window.updateDoc(window.doc(window.db, "plans", planId), { schedule: plan.schedule });
+                checkStreak();
+            }
+        }
+
+        // --- Create Plan Logic (Updated UI in HTML, Logic Same) ---
+        function openRescheduleModal() { document.getElementById('modal-reschedule').classList.remove('hidden'); }
+        async function handleReschedule(type) {
+            document.getElementById('modal-reschedule').classList.add('hidden');
+            if (type === 'reset') window.draftSubjects = [];
+            else if (type === 'edit') window.draftSubjects = window.studyPlans.map(p => p.config || { subject: p.subject, startDate: new Date().toISOString().split('T')[0], days: [1,3,5], rawContent: "", lessons: [] });
+            renderDraftList();
+            showScreen('screen-create-plan');
+        }
+
+        function renderDraftList() {
+            const listEl = document.getElementById('cp-draft-list');
+            listEl.innerHTML = '';
+            window.draftSubjects.forEach((sub, index) => {
+                listEl.insertAdjacentHTML('beforeend', `
+                    <div onclick="openSubjectEditor(${index})" class="subject-block bg-white border border-gray-100 rounded-2xl p-6 cursor-pointer flex justify-between items-center group relative overflow-hidden">
+                        <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-brand-main opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <div class="flex items-center gap-5">
+                            <div class="w-14 h-14 rounded-2xl bg-brand-bg text-brand-main flex items-center justify-center font-bold text-xl shadow-inner group-hover:bg-brand-main group-hover:text-white transition-colors">
+                                ${index + 1}
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-gray-800 text-lg mb-1 group-hover:text-brand-main transition-colors">${sub.subject || 'Môn học mới'}</h4>
+                                <div class="text-sm text-gray-500 flex items-center gap-3">
+                                    <span class="bg-gray-100 px-2 py-0.5 rounded text-xs font-bold"><i class="fa-regular fa-calendar mr-1"></i> ${sub.startDate || '?'}</span>
+                                    <span class="bg-gray-100 px-2 py-0.5 rounded text-xs font-bold"><i class="fa-solid fa-list-ol mr-1"></i> ${sub.lessons ? sub.lessons.length : 0} bài</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-gray-300 group-hover:text-brand-main group-hover:translate-x-1 transition-all">
+                            <i class="fa-solid fa-chevron-right text-xl"></i>
+                        </div>
+                    </div>
+                `);
+            });
+        }
+
+        function openSubjectEditor(index) {
+            window.editingIndex = index;
+            document.getElementById('cp-main-view').classList.add('hidden');
+            document.getElementById('cp-editor-view').classList.remove('hidden');
+            if (index !== null && window.draftSubjects[index]) {
+                const data = window.draftSubjects[index];
+                document.getElementById('cp-subject').value = data.subject || '';
+                document.getElementById('cp-start-date').value = data.startDate || '';
+                document.getElementById('cp-content').value = data.rawContent || '';
+                document.querySelectorAll('.cp-day').forEach(el => { el.checked = data.days.includes(parseInt(el.value)); });
+                if(data.lessons) window.tempLessons = data.lessons.map(l => l.name);
+            } else {
+                document.getElementById('cp-subject').value = '';
+                document.getElementById('cp-start-date').value = '';
+                document.getElementById('cp-content').value = '';
+                document.querySelectorAll('.cp-day').forEach(el => el.checked = false);
+            }
+            backToStep1();
+        }
+        function closeSubjectEditor() { document.getElementById('cp-editor-view').classList.add('hidden'); document.getElementById('cp-main-view').classList.remove('hidden'); }
+        function backToStep1() { document.getElementById('cp-step-2').classList.add('hidden'); document.getElementById('cp-step-1').classList.remove('hidden'); }
+        
+        function goToStep2() {
+            const content = document.getElementById('cp-content').value;
+            if(!content.trim()) { alert("Vui lòng nhập nội dung bài học."); return; }
+            const rawLessons = content.split('\n').filter(l => l.trim() !== "");
+            window.tempLessons = rawLessons;
+            
+            const listEl = document.getElementById('cp-lessons-list');
+            listEl.innerHTML = '';
+            
+            const currentDraft = window.editingIndex !== null ? window.draftSubjects[window.editingIndex] : null;
+
+            window.tempLessons.forEach((lessonName, i) => {
+                let pVal = 1, rVal = 0;
+                if(currentDraft && currentDraft.lessons && currentDraft.lessons[i] && currentDraft.lessons[i].name === lessonName) {
+                    pVal = currentDraft.lessons[i].practice;
+                    rVal = currentDraft.lessons[i].review;
+                }
+
+                listEl.insertAdjacentHTML('beforeend', `
+                    <div class="flex flex-col md:flex-row gap-4 items-center p-5 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                        <div class="flex-grow font-bold text-gray-700 text-base flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-blue-50 text-brand-main flex items-center justify-center text-xs font-bold">${i+1}</div>
+                            ${lessonName}
+                        </div>
+                        <div class="flex gap-4 w-full md:w-auto">
+                            <div class="flex items-center bg-gray-50 rounded-xl px-3 py-2 border border-gray-100">
+                                <span class="text-xs mr-2 text-gray-500 font-bold uppercase">Luyện tập</span>
+                                <input type="number" id="practice-${i}" value="${pVal}" min="0" class="w-12 bg-white border border-gray-200 rounded-lg p-1 text-center font-bold focus:border-brand-main outline-none">
+                            </div>
+                            <div class="flex items-center bg-gray-50 rounded-xl px-3 py-2 border border-gray-100">
+                                <span class="text-xs mr-2 text-gray-500 font-bold uppercase">Ôn thi</span>
+                                <input type="number" id="review-${i}" value="${rVal}" min="0" class="w-12 bg-white border border-gray-200 rounded-lg p-1 text-center font-bold focus:border-brand-main outline-none">
+                            </div>
+                        </div>
+                    </div>
+                `);
+            });
+            document.getElementById('cp-step-1').classList.add('hidden');
+            document.getElementById('cp-step-2').classList.remove('hidden');
+        }
+
+        function saveSubjectToDraft() {
+            const subject = document.getElementById('cp-subject').value;
+            const startDateStr = document.getElementById('cp-start-date').value;
+            const daysEls = document.querySelectorAll('.cp-day:checked');
+            const rawContent = document.getElementById('cp-content').value;
+
+            if(!subject || !startDateStr || daysEls.length === 0) { alert("Vui lòng điền đủ thông tin!"); return; }
+            const allowedDays = Array.from(daysEls).map(el => parseInt(el.value));
+            const lessonsConfig = window.tempLessons.map((name, i) => ({
+                name: name,
+                practice: parseInt(document.getElementById(`practice-${i}`).value) || 0,
+                review: parseInt(document.getElementById(`review-${i}`).value) || 0
+            }));
+            const subjectData = { subject, startDate: startDateStr, days: allowedDays, rawContent, lessons: lessonsConfig };
+            if (window.editingIndex !== null) window.draftSubjects[window.editingIndex] = subjectData;
+            else window.draftSubjects.push(subjectData);
+            closeSubjectEditor();
+            renderDraftList();
+        }
+
+        async function commitStudyPlan() {
+            if(window.draftSubjects.length === 0) { alert("Danh sách môn học trống!"); return; }
+            showScreen('screen-loading');
+            const batch = window.writeBatch(window.db);
+            const uid = window.currentUser.uid;
+            try {
+                const oldPlansQ = window.query(window.collection(window.db, "plans"), window.where("uid", "==", uid));
+                const oldSnaps = await window.getDocs(oldPlansQ);
+                oldSnaps.forEach(doc => batch.delete(doc.ref));
+                window.draftSubjects.forEach(sub => {
+                    const newRef = window.doc(window.collection(window.db, "plans"));
+                    let schedule = [];
+                    let currentDate = new Date(sub.startDate);
+                    function ensureValidDay(date) {
+                        while (!sub.days.includes(date.getDay())) date.setDate(date.getDate() + 1);
+                        return date;
+                    }
+                    currentDate = ensureValidDay(currentDate);
+                    sub.lessons.forEach(l => {
+                        schedule.push({ date: currentDate.toISOString().split('T')[0], subject: sub.subject, type: 'Học', content: l.name, completed: false, id: Date.now() + Math.random().toString() });
+                        currentDate.setDate(currentDate.getDate() + 1);
+                        for(let p=0; p < l.practice; p++) {
+                            currentDate = ensureValidDay(currentDate);
+                            schedule.push({ date: currentDate.toISOString().split('T')[0], subject: sub.subject, type: `Luyện tập ${p+1}`, content: l.name, completed: false, id: Date.now() + Math.random().toString() });
+                            currentDate.setDate(currentDate.getDate() + 1);
+                        }
+                        for(let r=0; r < l.review; r++) {
+                            currentDate = ensureValidDay(currentDate);
+                            schedule.push({ date: currentDate.toISOString().split('T')[0], subject: sub.subject, type: `Tổng ôn ${r+1}`, content: l.name, completed: false, id: Date.now() + Math.random().toString() });
+                            currentDate.setDate(currentDate.getDate() + 1);
+                        }
+                        currentDate = ensureValidDay(currentDate);
+                    });
+                    batch.set(newRef, { uid: uid, subject: sub.subject, config: sub, schedule: schedule, createdAt: new Date() });
+                });
+                await batch.commit();
+                alert("Đã tạo lộ trình thành công!");
+                await initAppData();
+                showScreen('screen-study-plan');
+            } catch(e) { console.error(e); alert("Lỗi khi lưu lộ trình: " + e.message); showScreen('screen-create-plan'); }
+        }
+
+        // --- Streak Logic (Simplified for Demo) ---
+        async function checkStreak() {
+            if(!window.currentUser || window.studyPlans.length === 0) return;
+            const todayStr = new Date().toISOString().split('T')[0];
+            let missed = 0;
+            let allDays = new Set();
+            window.studyPlans.forEach(plan => {
+                plan.schedule.forEach(task => {
+                    allDays.add(task.date);
+                    if (task.date < todayStr && !task.completed) missed++;
+                });
+            });
+            let sortedDays = Array.from(allDays).sort().reverse().filter(d => d <= todayStr);
+            let currentStreak = 0;
+            for(let d of sortedDays) {
+                let isDayDone = true;
+                window.studyPlans.forEach(p => { p.schedule.forEach(t => { if(t.date === d && !t.completed) isDayDone = false; }); });
+                if(d === todayStr) { if(isDayDone) currentStreak++; } 
+                else { if(isDayDone) currentStreak++; else break; }
+            }
+            if (window.userData.streak !== currentStreak || window.userData.missedSessions !== missed) {
+                window.userData.streak = currentStreak;
+                window.userData.missedSessions = missed;
+                await window.updateDoc(window.doc(window.db, "users", window.currentUser.uid), { streak: currentStreak, missedSessions: missed });
+            }
+            updateUIUserInfo();
+        }
+
+        function loadHomeData() {
+            const now = new Date();
+            const todayStr = now.toISOString().split('T')[0];
+            const daysOfWeek = ['CN', 'Th 2', 'Th 3', 'Th 4', 'Th 5', 'Th 6', 'Th 7'];
+            
+            // Format: "Th 7, 14 thg 2"
+            const formattedDate = `${daysOfWeek[now.getDay()]}, ${now.getDate()} thg ${now.getMonth() + 1}`;
+            
+            document.getElementById('home-full-date').innerText = formattedDate;
+
+            const list = document.getElementById('home-todo-list');
+            list.innerHTML = '';
+            let hasTask = false;
+            window.studyPlans.forEach(plan => {
+                plan.schedule.forEach(task => {
+                    if(task.date === todayStr) {
+                        hasTask = true;
+                        list.insertAdjacentHTML('beforeend', `
+                            <li class="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100 hover:shadow-md transition-shadow cursor-pointer group" onclick="openPomodoro('${task.content}', '${task.id}', '${plan.id}')">
+                                <input type="checkbox" ${task.completed ? 'checked' : ''} onclick="event.stopPropagation(); toggleTask('${plan.id}', '${task.id}', this.checked)" class="checkbox-circle">
+                                <div class="flex-grow">
+                                    <div class="flex items-baseline gap-2 mb-1">
+                                        <span class="font-bold text-brand-main text-sm">${task.subject}</span>
+                                        <span class="text-sm text-gray-500 font-medium italic">${task.type}</span>
+                                    </div>
+                                    <span class="${task.completed ? 'line-through text-gray-400' : 'text-gray-800'} font-medium text-lg block group-hover:text-brand-main transition-colors">${task.content}</span>
+                                </div>
+                            </li>
+                        `);
+                    }
+                });
+            });
+            if(!hasTask) list.innerHTML = `<li class="text-center py-8 opacity-70"><img src="${MASCOTS.swim}" class="h-24 mx-auto mb-2"><p class="text-gray-500">Hôm nay thảnh thơi!</p></li>`;
+        }
+
+        // --- Resources ---
+        let resources = [];
+        async function loadResources() {
+            if(resources.length === 0) {
+                 const q = window.query(window.collection(window.db, "resources"), window.where("uid", "==", window.currentUser.uid));
+                 const snap = await window.getDocs(q);
+                 resources = [];
+                 snap.forEach(d => resources.push({id: d.id, ...d.data()}));
+            }
+            renderResources('course');
+        }
+        function switchResTab(type) {
+            document.getElementById('tab-course').className = type === 'course' ? "px-6 py-2 rounded-lg bg-white shadow text-brand-main font-bold transition-all" : "px-6 py-2 rounded-lg text-gray-500 hover:text-gray-700 font-medium transition-all";
+            document.getElementById('tab-doc').className = type === 'doc' ? "px-6 py-2 rounded-lg bg-white shadow text-brand-main font-bold transition-all" : "px-6 py-2 rounded-lg text-gray-500 hover:text-gray-700 font-medium transition-all";
+            document.getElementById('res-course-content').className = type === 'course' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "hidden";
+            document.getElementById('res-doc-content').className = type === 'doc' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "hidden";
+            renderResources(type);
+        }
+        function renderResources(type) {
+            const container = type === 'course' ? document.getElementById('res-course-content') : document.getElementById('res-doc-content');
+            container.innerHTML = '';
+            resources.filter(r => r.type === type).forEach(res => {
+                container.insertAdjacentHTML('beforeend', `
+                    <a href="${res.url}" target="_blank" class="block bg-white p-5 rounded-2xl border border-gray-100 hover:shadow-lg transition-all flex items-center gap-4 group">
+                        <div class="w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center text-brand-main text-2xl group-hover:bg-brand-main group-hover:text-white transition-colors">
+                            <i class="${res.icon || 'fa-solid fa-link'}"></i>
+                        </div>
+                        <div class="overflow-hidden">
+                            <h4 class="font-bold text-gray-800 text-lg mb-1 truncate group-hover:text-brand-main transition-colors">${res.title}</h4>
+                            <p class="text-xs text-gray-400 truncate">${res.url}</p>
+                        </div>
+                    </a>
+                `);
+            });
+        }
+        async function addResource() {
+            const title = prompt("Nhập tiêu đề:"); if(!title) return;
+            const url = prompt("Nhập đường dẫn (URL):"); if(!url) return;
+            const type = confirm("Đây là Khóa học? (OK = Khóa học, Cancel = Tài liệu)") ? 'course' : 'doc';
+            const newRes = { uid: window.currentUser.uid, title, url, type, icon: type === 'course' ? 'fa-solid fa-graduation-cap' : 'fa-solid fa-book', createdAt: new Date() };
+            await window.addDoc(window.collection(window.db, "resources"), newRes);
+            resources.push(newRes); renderResources(type);
+        }
+
+        // --- Pomodoro ---
+        let currentPomoTask = null; 
+        function openPomodoro(taskName, taskId, planId) {
+            document.getElementById('pomo-task-name').innerText = taskName || "Tự học";
+            currentPomoTask = { planId, taskId };
+            showScreen('screen-pomodoro');
+        }
+        async function finishPomodoroTask() {
+            if(currentPomoTask && currentPomoTask.taskId) {
+                await toggleTask(currentPomoTask.planId, currentPomoTask.taskId, true);
+                showScreen('screen-home'); currentPomoTask = null; resetTimer();
+            } else { showScreen('screen-home'); }
+        }
+        function processQuizlet() {
+            const input = document.getElementById('quiz-input').value;
+            const lines = input.split(/[.\n]/).filter(l => l.trim().length > 0);
+            let result = "";
+            lines.forEach(line => {
+                const words = line.trim().split(' ');
+                if(words.length > 3) {
+                    const term = words.slice(0, 3).join(' '); const def = words.slice(3).join(' ');
+                    result += `${term} <tag> ${def}\n`;
+                } else { result += `${line.trim()} <tag> ...\n`; }
+            });
+            document.getElementById('quiz-output').value = result;
+        }
+        function copyQuizlet() { const copyText = document.getElementById("quiz-output"); copyText.select(); document.execCommand("copy"); alert("Đã sao chép!"); }
+        
+        let timerInterval; let timeLeft = 25 * 60;
+        function startTimer() { if(timerInterval) return; timerInterval = setInterval(() => { timeLeft--; updateTimerDisplay(); if(timeLeft <= 0) { clearInterval(timerInterval); alert("Hết giờ!"); } }, 1000); }
+        function pauseTimer() { clearInterval(timerInterval); timerInterval = null; }
+        function resetTimer() { pauseTimer(); timeLeft = 25 * 60; updateTimerDisplay(); }
+        function updateTimerDisplay() { const m = Math.floor(timeLeft / 60); const s = timeLeft % 60; document.getElementById('timer-display').innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`; }
+        function startStudySession() { openPomodoro("Học theo lộ trình hôm nay", null, null); }
+
+    </script>
+</body>
+</html>
